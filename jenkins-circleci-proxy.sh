@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# Trigger Jenkins job from CircleCi
+#
+# Uses CircleCI variables and variables from a CircleCI context
+# Variables defined in context:
+#   JENKINS_API_KEY, JENKINS_URL, JENKINS_JOB_TOKEN,
+#   JENKINS_BUILD_CAUSE
+# CircleCI Doc:
+#   https://circleci.com/docs/2.0/env-vars/
+#   https://circleci.com/docs/1.0/environment-variables/
+
+namespace=$1
+
+if [ "${CIRCLECI}" != 'true' ]; then
+  echo "ERROR: Not running under CircleCI"
+  exit 1
+fi
+
+# Get build numbers of artifacts
+if [ -d /tmp/workspace/build_nums ]; then
+  BuildNums=
+  for num in $(ls -1 /tmp/workspace/build_nums/*.num); do
+    BuildNums="${BuildNums},$(cat ${num})"
+  done
+  BuildNums=$(echo ${BuildNums} | cut -c2-)
+elif [ "${CIRCLE_STAGE}" == "ci" -o "${CIRCLE_STAGE}" == "Jenkins" ]; then
+  if [ "${CIRCLE_PREVIOUS_BUILD_NUM}" != "" ]; then
+    BuildNums="${CIRCLE_PREVIOUS_BUILD_NUM}"
+  else
+    BuildNums="${CIRCLE_BUILD_NUM}"
+  fi
+else
+  BuildNums="${CIRCLE_BUILD_NUM}"
+fi
+
+if [ "${CIRCLE_BRANCH}" == "master" ]; then
+  repoBaseURL="${CIRCLE_REPOSITORY_URL%.*}"
+  repo="${repoBaseURL##*/}"
+  job_name="${namespace}+${repo}+CI+Analytics+CircleCI"
+  build_cause="${JENKINS_BUILD_CAUSE}%20by%20${CIRCLE_USERNAME}"
+  params="&ORG=${CIRCLE_PROJECT_USERNAME}&PROJECT=${CIRCLE_PROJECT_REPONAME}&GIT_REF=${CIRCLE_SHA1}&BUILD_NUMS=${BuildNums}"
+  echo "INFO: Triggering Jenkins job: ${job_name}"
+  echo "INFO: Params: ${params}"
+  echo
+  curl -H "x-api-key: ${JENKINS_API_KEY}" "${JENKINS_URL}${job_name}/${JENKINS_JOB_TOKEN}/${build_cause}?${params}"
+fi
