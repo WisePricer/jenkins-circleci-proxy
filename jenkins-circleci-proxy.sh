@@ -10,6 +10,8 @@
 #   https://circleci.com/docs/2.0/env-vars/
 #   https://circleci.com/docs/1.0/environment-variables/
 
+set -e
+
 namespace=$1
 
 if [ "${CIRCLECI}" != 'true' ]; then
